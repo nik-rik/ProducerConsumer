@@ -29,10 +29,8 @@ int numProducers;
 int numConsumers;
 int n_jobs;
 
-//time
+//timeout time
 struct timespec timeoutTime;
-
-
 
 //semaphores
 sem_t emptySem;
@@ -46,8 +44,9 @@ queue<Job*> jobQueue;
 void *producer (void *id);
 void *consumer (void *id);
 
-int main (int argc, char **argv)
-{
+int main (int argc, char **argv){
+
+  //check number of arguments
   if (argc !=5){
     
     cerr << "Incorrect number of arguments!" << endl;
@@ -55,6 +54,14 @@ int main (int argc, char **argv)
 
   }
 
+  //check argument values
+  for(int i = 1; i < argc; i++){
+    if(check_arg(argv[i]) == -1){
+      cerr << "Argument number " << i << " is not valid" << endl;
+      return 0;
+    }
+  }
+  
   //initialise variables
   q_size = atoi(argv[1]);
   n_jobs = atoi(argv[2]);
@@ -96,21 +103,21 @@ int main (int argc, char **argv)
   sem_destroy(&emptySem);
   sem_destroy(&full);
   sem_destroy(&mutex);
+
   
   return 0;
 
 }
 
-void *producer (void *parameter) 
-{
+void *producer (void *parameter) {
   int id = *((int*)parameter);
+  int jobId = 0;
   int jobsProduced = 0;
   bool timeout = false;
   timeoutTime.tv_sec = 20;
   
   while(jobsProduced < n_jobs){
     //produce job
-    int jobId = rand() % 100;
     int jobDuration = rand() % 10 + 1;
     Job* newJob = new Job(jobId, jobDuration);
 
@@ -119,7 +126,7 @@ void *producer (void *parameter)
 
     //if operation times out then break loop
     if (timeout){
-      cout << "Producer(" << id << ") stopped beacause of timeout" << endl;
+      cout << "Producer(" << id << ") stopped because of timeout" << endl;
       break;
     }
     
@@ -137,6 +144,7 @@ void *producer (void *parameter)
     //sleep for 1-5 seconds
     sleep(rand() % 5 + 1);
 
+    jobId++;
     jobsProduced++;
   }
   
@@ -152,7 +160,6 @@ void *producer (void *parameter)
 void *consumer (void *parameter) 
 {
   int id = *((int*)parameter);
-  int jobsConsumed = 0;
   timeoutTime.tv_sec = 20;
 
   //wait for full slot
@@ -171,8 +178,6 @@ void *consumer (void *parameter)
 		
     //sleep for job duration
     sleep(job->duration);
-
-    jobsConsumed++;
   }
   
   cout << "Consumer(" << id << "): No more jobs left" << endl;
