@@ -29,6 +29,10 @@ int numProducers;
 int numConsumers;
 int n_jobs;
 
+//time
+struct timespec timeoutTime;
+
+
 
 //semaphores
 sem_t emptySem;
@@ -69,14 +73,14 @@ int main (int argc, char **argv)
   //create producer threads
   for(int i = 0; i < numProducers; i++){
     int* id = new int;
-    *id = i;
+    *id = i + 1;
     pthread_create(&producerid[i], NULL, producer, (void*)id);
   }
 
   //create consumer threads
   for(int i = 0; i < numConsumers; i++){
     int* id = new int;
-    *id = i;
+    *id = i + 1;
     pthread_create(&consumerid[i], NULL, consumer, (void*)id);
   }
   
@@ -101,14 +105,25 @@ void *producer (void *parameter)
 {
   int id = *((int*)parameter);
   int jobsProduced = 0;
+  bool timeout = false;
+  timeoutTime.tv_sec = 20;
+  
   while(jobsProduced < n_jobs){
     //produce job
     int jobId = rand() % 100;
     int jobDuration = rand() % 10 + 1;
     Job* newJob = new Job(jobId, jobDuration);
+
+    //wait for empty slot and store timeout state
+    timeout = sem_timedwait(&emptySem, &timeoutTime);
+
+    //if operation times out then break loop
+    if (timeout){
+      cout << "Producer(" << id << ") stopped beacause of timeout" << endl;
+      break;
+    }
     
-    //wait for empty slot
-    sem_wait(&emptySem);
+    //wait for empty mutex
     sem_wait(&mutex);
 		
     //add job to queue
@@ -138,9 +153,11 @@ void *consumer (void *parameter)
 {
   int id = *((int*)parameter);
   int jobsConsumed = 0;
-  while(jobsConsumed < n_jobs){
-    //wait for full slot
-    sem_wait(&full);
+  timeoutTime.tv_sec = 20;
+
+  //wait for full slot
+  while(sem_timedwait(&full, &timeoutTime) == 0){
+   
     sem_wait(&mutex);
 		
     //get job from queue
